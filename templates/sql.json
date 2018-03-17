@@ -1,0 +1,334 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "alertEmail": {
+      "type": "string",
+      "defaultValue": "person@absg.com",
+      "metadata": {
+        "description": "Email address to send alerts to"
+      }
+    },
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "deploymentSize": {
+      "type": "string",
+      "defaultValue": "Dev",
+      "allowedValues": [
+        "Dev",
+        "Test",
+        "Stage",
+        "Prod"
+      ],
+      "metadata": {
+        "description": "The deployment size will determine how resources scale and fan out."
+      }
+    },
+    "serverRegions": {
+      "type": "array",
+      "defaultValue": [
+        "eastus",
+        "westus"
+      ],
+      "minLength": 2,
+      "metadata": {
+        "description": "The regions the infrastructure will be deployed to."
+      }
+    },
+    "sqlAdministratorLogin": {
+      "type": "string",
+      "defaultValue": "psgadmin",
+      "metadata": {
+        "description": "The username for the SQL admin"
+      }
+    },
+    "sqlDatabaseName": {
+      "type": "string"
+    },
+    "sqlSecretName": {
+      "type": "string",
+      "metadata": {
+        "description": "The secret name in keyvault to use for administrator password."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "deploySize": "[variables(concat('deploySize',parameters('deploymentSize')))]",
+    "deploySizeDev": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Small",
+      "skuWorkerAmount": 1,
+      "vaultName": "psg-cp-dev-arm-keyvault"
+    },
+    "deploySizeTest": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Small",
+      "skuWorkerAmount": 1,
+      "vaultName": "psg-cp-test-arm-keyvault"
+    },
+    "deploySizeStage": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Medium",
+      "skuWorkerAmount": 2,
+      "vaultName": "psg-cp-stge-arm-keyvault"
+    },
+    "deploySizeProd": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Medium",
+      "skuWorkerAmount": 2,
+      "vaultName": "psg-cp-prod-arm-keyvault"
+    },
+    "templateBaseUrl": "https://providersolution.blob.core.windows.net/arm-templates/",
+    "regionAmount": "[length(parameters('serverRegions'))]",
+    "sqlReplicas": "[sub(variables('regionAmount'), 1)]",
+    "sqlServerLast": "[concat('sqlServer', sub(variables('regionAmount'), 1))]",
+    "webAppAmount": "[length(parameters('serverRegions'))]",
+    "vaultId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/psg-management/providers/Microsoft.KeyVault/vaults/', variables('deploySize').vaultName)]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-01-01",
+      "name": "sqlServer0",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "contentVersion": "1.0.0.0",
+          "uri": "[concat(variables('templateBaseUrl'), 'azuresql-server.json')]"
+        },
+        "parameters": {
+          "appName": {
+            "value": "[concat(parameters('appName'), 0)]"
+          },
+          "admin": {
+            "value": "[parameters('sqlAdministratorLogin')]"
+          },
+          "adminPassword": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[parameters('sqlSecretName')]"
+            }
+          },
+          "serverRegion": {
+            "value": "[parameters('serverRegions')[0]]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "[concat('sqlServer', copyIndex(1))]",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'sqlServer0')]"
+      ],
+      "copy": {
+        "name": "sqlReplicaCopy",
+        "count": "[variables('sqlReplicas')]"
+      },
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "contentVersion": "1.0.0.0",
+          "uri": "[concat(variables('templateBaseUrl'), 'azuresql-server.json')]"
+        },
+        "parameters": {
+          "appName": {
+            "value": "[concat(parameters('appName'), copyIndex(1))]"
+          },
+          "admin": {
+            "value": "[parameters('sqlAdministratorLogin')]"
+          },
+          "adminPassword": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[parameters('sqlSecretName')]"
+            }
+          },
+          "serverRegion": {
+            "value": "[parameters('serverRegions')[copyIndex(1)]]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "_resourceIds": {
+            "value": "[reference(concat('sqlServer', copyIndex())).outputs._resourceIds.value]"
+          },
+          "_serverNames": {
+            "value": "[reference(concat('sqlServer', copyIndex())).outputs._serverNames.value]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "sqlDatabase0",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'sqlServer0')]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "contentVersion": "1.0.0.0",
+          "uri": "[concat(variables('templateBaseUrl'), 'azuresql-db.json')]"
+        },
+        "parameters": {
+          "alertEmail": {
+            "value": "[parameters('alertEmail')]"
+          },
+          "databaseName": {
+            "value": "[parameters('sqlDatabaseName')]"
+          },
+          "serverName": {
+            "value": "[reference('sqlServer0').outputs.serverName.value]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "sqlIntegrationDatabase",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'sqlServer0')]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "contentVersion": "1.0.0.0",
+          "uri": "[concat(variables('templateBaseUrl'), 'azuresql-db.json')]"
+        },
+        "parameters": {
+          "alertEmail": {
+            "value": "[parameters('alertEmail')]"
+          },
+          "databaseName": {
+            "value": "[concat(parameters('sqlDatabaseName'), '-integration')]"
+          },
+          "serverName": {
+            "value": "[reference('sqlServer0').outputs.serverName.value]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "[concat('sqlDatabase', copyIndex(1))]",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'sqlServer0')]",
+        "[concat('Microsoft.Resources/deployments/', 'sqlServer', copyIndex(1))]"
+      ],
+      "copy": {
+        "name": "sqlDatabaseCopy",
+        "count": "[variables('sqlReplicas')]"
+      },
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "contentVersion": "1.0.0.0",
+          "uri": "[concat(variables('templateBaseUrl'), 'azuresql-db-replica.json')]"
+        },
+        "parameters": {
+          "databaseName": {
+            "value": "[reference('sqlDatabase0').outputs.databaseName.value]"
+          },
+          "serverName": {
+            "value": "[reference(concat('sqlServer', copyIndex(1))).outputs.serverName.value]"
+          },
+          "serverRegion": {
+            "value": "[reference(concat('sqlServer', copyIndex(1))).outputs.serverRegion.value]"
+          },
+          "sourceServerName": {
+            "value": "[reference('sqlServer0').outputs.serverName.value]"
+          }
+        }
+      }
+    },      
+    {
+      "apiVersion": "2015-01-01",
+      "name": "applicationInsights",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'appinsights.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appInsightsName": {
+            "value": "[concat('appinsights', parameters('appName'))]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "instrumentationKey": {
+      "type": "string",
+      "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+    },
+    "sqlAdministratorLogin": {
+      "type": "string",
+      "value": "[reference('sqlServer0').outputs.admin.value]"
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "value": "[reference('sqlDatabase0').outputs.databaseName.value]"
+    },
+    "sqlIntegrationDatabaseName": {
+      "type": "string",
+      "value": "[reference('sqlIntegrationDatabase').outputs.databaseName.value]"
+    },
+    "sqlSecretName": {
+      "type": "string",
+      "value": "[parameters('sqlSecretName')]"
+    },
+    "sqlUrl": {
+      "type": "string",
+      "value": "[concat(reference('sqlServer0').outputs.serverName.value, '.database.secure.windows.net')]"
+    },
+    "sqlServerName": {
+      "type": "string",
+      "value": "[reference('sqlServer0').outputs.serverName.value]"
+    },
+    "vaultName": {
+      "type": "string",
+      "value": "[variables('deploySize').vaultName]"
+    }
+  }
+}

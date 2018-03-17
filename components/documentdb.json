@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "accountLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "The location of the DocumentDB Account."
+      }
+    },
+    "accountName": {
+      "type": "string",
+      "metadata": {
+        "description": "The DocumentDB database account name."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "accountTier": "Standard"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-04-08",
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "name": "[parameters('accountName')]",
+      "location": "[parameters('accountLocation')]",
+      "properties": {
+        "name": "[parameters('accountName')]",
+        "databaseAccountOfferType": "[variables('accountTier')]",
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session",
+          "maxIntervalInSeconds": 5,
+          "maxStalenessPrefix": 100
+        }
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      }
+    }
+  ],
+  "outputs": {
+    "endpoint": {
+      "type": "string",
+      "value": "[reference(concat('Microsoft.DocumentDB/databaseAccounts/', parameters('accountName'))).documentEndpoint]"
+    },
+    "key": {
+      "type": "string",
+      "value": "[listKeys(concat(parameters('accountName')),'2015-04-08').primaryMasterKey]"
+    }
+  }
+}

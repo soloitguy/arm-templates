@@ -1,0 +1,335 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "alertEmail": {
+            "defaultValue": "ConnectPlatform@absg.com",
+            "type": "String",
+            "metadata": {
+                "description": "Email address to send system alerts to."
+            }
+        },
+        "appName": {
+            "type": "String",
+            "metadata": {
+                "description": "The build id will determine how resources are named and identified."
+            }
+        },
+        "envUrl": {
+            "defaultValue": "",
+            "type": "String"
+        },
+        "instrumentationKey": {
+            "defaultValue": "",
+            "type": "String"
+        },
+        "vaultId": {
+            "defaultValue": "",
+            "type": "String"
+        },
+        "skuName": {
+            "defaultValue": "Standard",
+            "type": "String"
+        },
+        "skuWorkerAmount": {
+            "defaultValue": 1,
+            "type": "Int"
+        },
+        "skuWorkerSize": {
+            "defaultValue": "Small",
+            "allowedValues": [
+                "Small",
+                "Medium"
+            ],
+            "type": "String"
+        },
+        "serverRegion": {
+            "defaultValue": "eastus",
+            "type": "String",
+            "metadata": {
+                "description": "Set the regions to deploy to"
+            }
+        },
+        "tags": {
+            "defaultValue": {
+                "businessUnit": "",
+                "capability": "",
+                "costCenter": "",
+                "createdBy": "",
+                "environment": "",
+                "owner": ""
+            },
+            "type": "Object",
+            "metadata": {
+                "description": "The tagging structure required for accurate governance."
+            }
+        },
+        "_appUrls": {
+            "defaultValue": [],
+            "type": "Array",
+            "metadata": {
+                "description": "For the purpose of looping and roundtripping values through templates."
+            }
+        },
+        "_resourceIds": {
+            "defaultValue": [],
+            "type": "Array",
+            "metadata": {
+                "description": "For the purpose of looping and roundtripping values through templates."
+            }
+        }
+    },
+    "variables": {
+        "appName": "[concat('app-', parameters('appName'))]",
+        "serverFarmName": "[concat('serverfarm-', parameters('appName'))]",
+        "appBase": "[substring(variables('appName'), 0, sub(length(variables('appName')), 1))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "name": "[variables('serverFarmName')]",
+            "apiVersion": "2014-06-01",
+            "location": "[parameters('serverRegion')]",
+            "tags": {
+                "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+                "capability": "[toUpper(parameters('tags').capability)]",
+                "costCenter": "[toUpper(parameters('tags').costCenter)]",
+                "createdBy": "[toLower(parameters('tags').createdBy)]",
+                "environment": "[toLower(parameters('tags').environment)]",
+                "owner": "[toLower(parameters('tags').owner)]"
+            },
+            "properties": {
+                "name": "[variables('serverFarmName')]",
+                "sku": "[parameters('skuName')]",
+                "numberOfWorkers": "[parameters('skuWorkerAmount')]",
+                "workerSize": "[parameters('skuWorkerSize')]"
+            },
+            "resources": [
+                {
+                    "type": "Microsoft.Insights/alertrules",
+                    "name": "[concat(variables('serverFarmName'), '-alert-cpu-high')]",
+                    "apiVersion": "2014-04-01",
+                    "location": "[resourceGroup().location]",
+                    "properties": {
+                        "name": "HighCpu",
+                        "description": "The average CPU is high across all the instances",
+                        "isEnabled": true,
+                        "condition": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                            "dataSource": {
+                                "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                                "resourceUri": "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]",
+                                "metricName": "CpuPercentage"
+                            },
+                            "operator": "GreaterThan",
+                            "threshold": 60,
+                            "windowSize": "PT15M"
+                        },
+                        "action": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                            "sendToServiceOwners": false,
+                            "customEmails": [
+                                "[parameters('alertEmail')]"
+                            ]
+                        }
+                    },
+                    "dependsOn": [
+                        "[variables('serverFarmName')]"
+                    ]
+                },
+                {
+                    "type": "Microsoft.Insights/alertrules",
+                    "name": "[concat(variables('serverFarmName'), '-alert-http-queue')]",
+                    "apiVersion": "2014-04-01",
+                    "location": "[resourceGroup().location]",
+                    "properties": {
+                        "name": "LongHttpQueue",
+                        "description": "HTTP queue has a large number of pending requests",
+                        "isEnabled": true,
+                        "condition": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                            "dataSource": {
+                                "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                                "resourceUri": "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]",
+                                "metricName": "HttpQueueLength"
+                            },
+                            "operator": "GreaterThan",
+                            "threshold": 40,
+                            "windowSize": "PT15M"
+                        },
+                        "action": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                            "sendToServiceOwners": false,
+                            "customEmails": [
+                                "[parameters('alertEmail')]"
+                            ]
+                        }
+                    },
+                    "dependsOn": [
+                        "[variables('serverFarmName')]"
+                    ]
+                }
+            ],
+            "dependsOn": []
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "name": "[variables('appName')]",
+            "apiVersion": "2015-08-01",
+            "location": "[parameters('serverRegion')]",
+            "tags": {
+                "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+                "capability": "[toUpper(parameters('tags').capability)]",
+                "costCenter": "[toUpper(parameters('tags').costCenter)]",
+                "createdBy": "[toLower(parameters('tags').createdBy)]",
+                "environment": "[toLower(parameters('tags').environment)]",
+                "owner": "[toLower(parameters('tags').owner)]"
+            },
+            "properties": {
+                "name": "[variables('appName')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]"
+            },
+            "resources": [
+                {
+                    "type": "slots",
+                    "name": "staging",
+                    "apiVersion": "2015-04-01",
+                    "location": "[parameters('serverRegion')]",
+                    "properties": {},
+                    "resources": [
+                        {
+                            "type": "config",
+                            "name": "appsettings",
+                            "apiVersion": "2015-08-01",
+                            "properties": {
+                                "WEBSITE_NODE_DEFAULT_VERSION": "6.9.1"
+                            },
+                            "dependsOn": [
+                                "staging"
+                            ]
+                        }
+                    ],
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', variables('appName'))]"
+                    ]
+                },
+                {
+                    "type": "config",
+                    "name": "slotconfignames",
+                    "apiVersion": "2015-08-01",
+                    "properties": {
+                        "appSettingNames": [
+                            "Abc__Absg__ApplicationInsights__InstrumentationKey"
+                        ]
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/Sites', variables('appName'))]"
+                    ]
+                },
+                {
+                    "type": "config",
+                    "name": "appsettings",
+                    "apiVersion": "2015-08-01",
+                    "properties": {
+                        "WEBSITE_NODE_DEFAULT_VERSION": "6.9.1",
+                        "Abc__Absg__ApplicationInsights__InstrumentationKey": "[parameters('instrumentationKey')]"
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/Sites', variables('appName'))]"
+                    ]
+                },
+                {
+                    "type": "microsoft.insights/alertrules",
+                    "name": "[concat(variables('appName'), '-5xx-errors')]",
+                    "apiVersion": "2014-04-01",
+                    "location": "[resourceGroup().location]",
+                    "properties": {
+                        "name": "500Errors",
+                        "description": "",
+                        "isEnabled": true,
+                        "condition": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                            "dataSource": {
+                                "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                                "resourceUri": "[resourceId('Microsoft.Web/sites',variables('appName'))]",
+                                "metricName": "Http5xx"
+                            },
+                            "operator": "GreaterThanOrEqual",
+                            "threshold": 5,
+                            "windowSize": "PT15M"
+                        },
+                        "action": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                            "sendToServiceOwners": false,
+                            "customEmails": [
+                                "[parameters('alertEmail')]"
+                            ]
+                        }
+                    },
+                    "resources": [],
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', variables('appName'))]"
+                    ]
+                },
+                {
+                    "type": "microsoft.insights/alertrules",
+                    "name": "[concat(variables('appName'), '-response-time')]",
+                    "apiVersion": "2014-04-01",
+                    "location": "[resourceGroup().location]",
+                    "properties": {
+                        "name": "AverageResponseTime",
+                        "description": "",
+                        "isEnabled": true,
+                        "condition": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                            "dataSource": {
+                                "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                                "resourceUri": "[resourceId('Microsoft.Web/sites',variables('appName'))]",
+                                "metricName": "AverageResponseTime"
+                            },
+                            "operator": "GreaterThanOrEqual",
+                            "threshold": 5,
+                            "windowSize": "PT15M"
+                        },
+                        "action": {
+                            "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                            "sendToServiceOwners": false,
+                            "customEmails": [
+                                "[parameters('alertEmail')]"
+                            ]
+                        }
+                    },
+                    "resources": [],
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', variables('appName'))]"
+                    ]
+                }
+            ],
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]"
+            ]
+        }
+    ],
+    "outputs": {
+        "id": {
+            "type": "String",
+            "value": "[resourceId('Microsoft.Web/sites', variables('appName'))]"
+        },
+        "appResourceName": {
+            "type": "String",
+            "value": "[variables('appBase')]"
+        },
+        "url": {
+            "type": "String",
+            "value": "[reference(resourceId('Microsoft.Web/sites', variables('appName'))).defaultHostName]"
+        },
+        "_appUrls": {
+            "type": "Array",
+            "value": "[concat(parameters('_appUrls'),split(reference(variables('appName')).defaultHostName, ','))]"
+        },
+        "_resourceIds": {
+            "type": "Array",
+            "value": "[concat(parameters('_resourceIds'),split(resourceId('Microsoft.Web/sites', variables('appName')), ','))]"
+        }
+    }
+}

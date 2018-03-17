@@ -1,0 +1,238 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "netCoreEnvironment": {
+      "type": "string",
+      "defaultValue": "Development",
+      "metadata": {
+        "description": "ASP .NET Core Environment for AppSettings."
+      }
+    },
+    "alertEmail": {
+      "type": "string",
+      "defaultValue": "ConnectPlatform@absg.com",
+      "metadata": {
+        "description": "Email address to send system alerts to."
+      }
+    },
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "connectionDatabase": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "connectionIntegrationDatabase": {
+            "defaultValue": "",
+            "type": "String"
+    },
+    "connectionPassword": {
+      "type": "securestring",
+      "defaultValue": ""
+    },
+    "connectionUrl": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "connectionUser": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "instrumentationKey": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "endpointConnection": {
+      "type": "string",
+      "defaultValue": ""
+    },
+     "endpointConnectionSecondary": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "absgNotificationEmailSendGridApiKey":{
+      "type": "string",
+      "defaultValue": ""
+    },
+    "skuName": {
+      "type": "string",
+      "defaultValue": "Standard"
+    },
+    "skuWorkerAmount": {
+      "type": "int",
+      "defaultValue": 1
+    },
+    "skuWorkerSize": {
+      "type": "string",
+      "defaultValue": "Small",
+      "allowedValues": [
+        "Small",
+        "Medium"
+      ]
+    },
+    "serverRegion": {
+      "type": "string",
+      "defaultValue": "eastus2",
+      "metadata": {
+        "description": "Set the regions to deploy to"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    },
+    "_appUrls": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "For the purpose of looping and roundtripping values through templates."
+      }
+    },
+    "_resourceIds": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "For the purpose of looping and roundtripping values through templates."
+      }
+    }
+  },
+  "variables": {
+    "functionAppName": "[concat('func-', parameters('appName'))]",
+    "functionAppStorageAccountName": "[concat(replace(parameters('appName'),'-',''), 'func')]",
+    "serverFarmName": "[concat('serverfarm-', parameters('appName'))]",
+    "funcBase": "[substring(variables('functionAppName'), 0, sub(length(variables('functionAppName')), 1))]"
+  },
+  "resources": [
+    {
+      "name": "[variables('serverFarmName')]",
+      "type": "Microsoft.Web/serverfarms",
+      "location": "[parameters('serverRegion')]",
+      "apiVersion": "2014-06-01",
+      "dependsOn": [],
+      "properties": {
+        "name": "[variables('serverFarmName')]",
+        "computeMode": "Shared",
+        "sku": "Dynamic",
+        "numberOfWorkers": "[parameters('skuWorkerAmount')]",
+        "workerSize": "[parameters('skuWorkerSize')]"
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      },
+      "resources": []
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "Storage",
+      "name": "[variables('functionAppStorageAccountName')]",
+      "apiVersion": "2016-01-01",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      },
+      "properties": {
+        "encryption": {
+          "services": {
+            "blob": {
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        }
+      }
+    },
+    {
+      "name": "[variables('functionAppName')]",
+      "type": "Microsoft.Web/sites",
+      "location": "[parameters('serverRegion')]",
+      "apiVersion": "2015-08-01",
+      "kind": "functionapp",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionAppStorageAccountName'))]"
+      ],
+      "properties": {
+        "name": "[variables('functionAppName')]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]",
+        "hostingEnvironment": "",
+        "clientAffinityEnabled": false,
+        "computeMode": "Shared",
+        "sku": "Dynamic"
+      },
+      "resources": [
+        {
+          "apiVersion": "2015-08-01",
+          "type": "config",
+          "name": "appsettings",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/Sites', variables('functionAppName'))]"
+          ],
+          "properties": {
+            "FUNCTIONS_EXTENSION_VERSION": "~1",
+            "APPINSIGHTS_INSTRUMENTATIONKEY":"[parameters('instrumentationKey')]",
+            "Abc__Absg__ConnectionStrings__DefaultConnection": "[concat('Data Source=tcp:', parameters('connectionUrl'), ',1433;Initial Catalog=', parameters('connectionDatabase'), ';User Id=', parameters('connectionUser'), '@', parameters('connectionUrl'), ';Password=', parameters('connectionPassword'), ';')]",
+            "SqlConnection": "[concat('Data Source=tcp:', parameters('connectionUrl'), ',1433;Initial Catalog=', parameters('connectionDatabase'), ';User Id=', parameters('connectionUser'), '@', parameters('connectionUrl'), ';Password=', parameters('connectionPassword'), ';')]",
+            "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('functionAppstorageAccountName'),';AccountKey=',listkeys(resourceId('Microsoft.Storage/storageAccounts', variables('functionAppstorageAccountName')), '2015-05-01-preview').key1,';')]",
+            "AzureWebJobsDashboard": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('functionAppstorageAccountName'),';AccountKey=',listkeys(resourceId('Microsoft.Storage/storageAccounts', variables('functionAppstorageAccountName')), '2015-05-01-preview').key1,';')]",
+            "EndpointConnection": "[parameters('endpointConnection')]",
+            "EndpointConnectionSecondary": "[parameters('endpointConnectionSecondary')]",
+            "Absg:Notification:Email:SendGrid:ApiKey": "[parameters('AbsgNotificationEmailSendGridApiKey')]"
+          }
+        }
+      ],
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      }
+    }
+  ],
+  "outputs": {
+    "appResourceName": {
+      "type": "string",
+      "value": "[variables('funcBase')]"
+    },
+    "functionUrl": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName'))).defaultHostName]"
+    },
+    "_appUrls": {
+      "type": "array",
+      "value": "[concat(parameters('_appUrls'),split(reference(variables('functionAppName')).defaultHostName, ','))]"
+    },
+    "_resourceIds": {
+      "type": "array",
+      "value": "[concat(parameters('_resourceIds'),split(resourceId('Microsoft.Web/sites', variables('functionAppName')), ','))]"
+    }
+  }
+}

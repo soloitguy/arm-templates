@@ -1,0 +1,303 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "alertEmail": {
+      "type": "string",
+      "defaultValue": "PT-SystemsTeam@absg.com",
+      "metadata": {
+        "description": "Email address to send alerts to."
+      }
+    },
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "admin": {
+      "type": "string",
+      "defaultValue": "psgadmin",
+      "metadata": {
+        "description": "The admin user of the SQL Server"
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The password of the admin user of the SQL Server"
+      }
+    },
+    "databaseName": {
+      "type": "string",
+      "defaultValue": "database",
+      "metadata": {
+        "description": "The name of the database to be created with SQL Server"
+      }
+    },
+    "serverRegions": {
+      "type": "array",
+      "defaultValue": [
+        "eastus",
+        "westus"
+      ],
+      "minLength": 2,
+      "metadata": {
+        "description": "Set the regions to deploy to"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "edition": "Standard",
+    "sku": "S0",
+    "replicaCount": "[sub(length(parameters('ServerRegions')), 1)]",
+    "sqlserverName": "[concat('sqlserver-', parameters('appName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Sql/servers",
+      "name": "[concat(variables('sqlserverName'), '-master')]",
+      "apiVersion": "2014-04-01-preview",
+      "location": "[parameters('ServerRegions')[0]]",
+      "properties": {
+        "administratorLogin": "[parameters('admin')]",
+        "administratorLoginPassword": "[parameters('adminPassword')]",
+        "version": "12.0"
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      },
+      "resources": [
+        {
+          "type": "databases",
+          "name": "[parameters('databaseName')]",
+          "apiVersion": "2014-04-01-preview",
+          "location": "[parameters('ServerRegions')[0]]",
+          "properties": {
+            "collation": "SQL_Latin1_General_CP1_CI_AS",
+            "edition": "[variables('edition')]",
+            "requestedServiceObjectiveName": "[variables('sku')]"
+          },
+          "dependsOn": [
+            "[concat(variables('sqlserverName'), '-master')]"
+          ],
+          "resources": [
+            {
+              "name": "current",
+              "type": "transparentDataEncryption",
+              "dependsOn": [
+                "[parameters('databaseName')]"
+              ],
+              "location": null,
+              "apiVersion": "2014-04-01",
+              "properties": {
+                "status": "Enabled"
+              }
+            },
+            {
+              "type": "microsoft.insights/alertrules",
+              "name": "[concat(parameters('databaseName'), '-cpu-percentage-alert')]",
+              "apiVersion": "2014-04-01",
+              "location": "eastus",
+              "properties": {
+                "name": "DbCpuPercentageAlert",
+                "description": "CPU > 50 percent",
+                "isEnabled": true,
+                "condition": {
+                  "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                  "dataSource": {
+                    "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                    "resourceUri": "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]",
+                    "metricName": "cpu_percent"
+                  },
+                  "threshold": 50,
+                  "windowSize": "PT5M"
+                },
+                "action": {
+                  "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                  "sendToServiceOwners": false,
+                  "customEmails": [
+                    "[parameters('alertEmail')]"
+                  ]
+                }
+              },
+              "resources": [],
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]"
+              ]
+            },
+            {
+              "type": "microsoft.insights/alertrules",
+              "name": "[concat(parameters('databaseName'), '-deadlock-alert')]",
+              "apiVersion": "2014-04-01",
+              "location": "eastus",
+              "properties": {
+                "name": "DeadlockAlert",
+                "description": "Deadlocks > 10",
+                "isEnabled": true,
+                "condition": {
+                  "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                  "dataSource": {
+                    "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                    "resourceUri": "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]",
+                    "metricName": "deadlock"
+                  },
+                  "threshold": 10,
+                  "windowSize": "PT5M"
+                },
+                "action": {
+                  "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                  "sendToServiceOwners": false,
+                  "customEmails": [
+                    "[parameters('alertEmail')]"
+                  ]
+                }
+              },
+              "resources": [],
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]"
+              ]
+            },
+            {
+              "type": "microsoft.insights/alertrules",
+              "name": "[concat(parameters('databaseName'), '-failed-connection-alert')]",
+              "apiVersion": "2014-04-01",
+              "location": "eastus",
+              "properties": {
+                "name": "FailedConnections",
+                "description": "Failed Connection > 10",
+                "isEnabled": true,
+                "condition": {
+                  "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+                  "dataSource": {
+                    "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+                    "resourceUri": "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]",
+                    "metricName": "connection_failed"
+                  },
+                  "threshold": 10,
+                  "windowSize": "PT5M"
+                },
+                "action": {
+                  "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+                  "sendToServiceOwners": false,
+                  "customEmails": [
+                    "[parameters('alertEmail')]"
+                  ]
+                }
+              },
+              "resources": [],
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "firewallrules",
+          "name": "AllowAllWindowsAzureIps",
+          "apiVersion": "2014-04-01-preview",
+          "location": "[parameters('ServerRegions')[0]]",
+          "properties": {
+            "endIpAddress": "0.0.0.0",
+            "startIpAddress": "0.0.0.0"
+          },
+          "dependsOn": [
+            "[concat(variables('sqlserverName'), '-master')]"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Sql/servers",
+      "name": "[concat(variables('sqlserverName'), '-replica-', add(copyIndex(),1))]",
+      "apiVersion": "2014-04-01-preview",
+      "location": "[parameters('ServerRegions')[add(copyIndex(),1)]]",
+      "copy": {
+        "name": "sqlservercopy",
+        "count": "[variables('replicaCount')]"
+      },
+      "properties": {
+        "administratorLogin": "[parameters('admin')]",
+        "administratorLoginPassword": "[parameters('adminPassword')]",
+        "version": "12.0"
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      },
+      "resources": [
+        {
+          "type": "databases",
+          "name": "[parameters('databaseName')]",
+          "apiVersion": "2014-04-01-preview",
+          "location": "[parameters('ServerRegions')[add(copyIndex(),1)]]",
+          "properties": {
+            "createMode": "OnlineSecondary",
+            "sourceDatabaseId": "[resourceId('Microsoft.Sql/servers/databases', concat(variables('sqlserverName'), '-master'), parameters('databaseName'))]",
+            "collation": "SQL_Latin1_General_CP1_CI_AS",
+            "edition": "[variables('edition')]",
+            "requestedServiceObjectiveName": "[variables('sku')]"
+          },
+          "dependsOn": [
+            "[concat(variables('sqlserverName'), '-master')]",
+            "[concat(variables('sqlserverName'), '-replica-', add(copyIndex(),1))]"
+          ]
+        },
+        {
+          "type": "firewallrules",
+          "name": "AllowAllWindowsAzureIps",
+          "apiVersion": "2014-04-01-preview",
+          "location": "[parameters('ServerRegions')[add(copyIndex(),1)]]",
+          "properties": {
+            "endIpAddress": "0.0.0.0",
+            "startIpAddress": "0.0.0.0"
+          },
+          "dependsOn": [
+            "[concat(variables('sqlserverName'), '-replica-', add(copyIndex(),1))]"
+          ]
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "admin": {
+      "type": "string",
+      "value": "[parameters('admin')]"
+    },
+    "databaseName": {
+      "type": "string",
+      "value": "[parameters('databaseName')]"
+    },
+    "password": {
+      "type": "securestring",
+      "value": "[parameters('adminPassword')]"
+    },
+    "url": {
+      "type": "string",
+      "value": "[reference(concat('Microsoft.Sql/servers/', variables('sqlserverName'), '-master')).fullyQualifiedDomainName]"
+    }
+  }
+}

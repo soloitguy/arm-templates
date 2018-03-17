@@ -1,0 +1,527 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "availabilitySets_ssrs_as_name": {
+            "defaultValue": "ssrs-as",
+            "type": "String"
+        },
+        "virtualMachines_ssrs_apim2_name": {
+            "defaultValue": "ssrs-apim2",
+            "type": "String"
+        },
+        "virtualMachines_ssrsapim_name": {
+            "defaultValue": "ssrsapim",
+            "type": "String"
+        },
+        "loadBalancers_ssrs_lb_name": {
+            "defaultValue": "ssrs-lb",
+            "type": "String"
+        },
+        "networkInterfaces_ssrs_apim2345_name": {
+            "defaultValue": "ssrs-apim2345",
+            "type": "String"
+        },
+        "networkInterfaces_ssrsapim638_name": {
+            "defaultValue": "ssrsapim638",
+            "type": "String"
+        },
+        "networkSecurityGroups_ssrs_nsg_name": {
+            "defaultValue": "ssrs-nsg",
+            "type": "String"
+        },
+        "publicIPAddresses_ssrs_apim2345_pub_name": {
+            "defaultValue": "ssrs-apim2345-pub",
+            "type": "String"
+        },
+        "publicIPAddresses_ssrsapim638_pub_name": {
+            "defaultValue": "ssrsapim638-pub",
+            "type": "String"
+        },
+        "virtualNetworks_ssrs_vnet_name": {
+            "defaultValue": "ssrs-vnet",
+            "type": "String"
+        },
+        "storageAccounts_absgsbapimssrstest407_name": {
+            "defaultValue": "absgsbapimssrstest407",
+            "type": "String"
+        },
+        "storageAccounts_absgsbapimssrstest409_name": {
+            "defaultValue": "absgsbapimssrstest409",
+            "type": "String"
+        },
+        "storageAccounts_absgsbapimssrstest773_name": {
+            "defaultValue": "absgsbapimssrstest773",
+            "type": "String"
+        },
+        "storageAccounts_absgsbapimssrstest872_name": {
+            "defaultValue": "absgsbapimssrstest872",
+            "type": "String"
+        },
+        "virtualNetworks_ssrs_vnet_id": {
+            "defaultValue": "/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimvnet/providers/Microsoft.Network/virtualNetworks/absg-sb-apimvnet-vnet",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Compute/availabilitySets/ssrs-as'.",
+            "type": "Microsoft.Compute/availabilitySets",
+            "sku": {
+                "name": "Classic"
+            },
+            "name": "[parameters('availabilitySets_ssrs_as_name')]",
+            "apiVersion": "2016-04-30-preview",
+            "location": "eastus2",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "platformUpdateDomainCount": 5,
+                "platformFaultDomainCount": 2,
+                "virtualMachines": [
+                    {
+                        "id": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ssrs_apim2_name'))]"
+                    },
+                    {
+                        "id": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ssrsapim_name'))]"
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ssrs_apim2_name'))]",
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_ssrsapim_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Compute/virtualMachines/ssrs-apim2'.",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('virtualMachines_ssrs_apim2_name')]",
+            "apiVersion": "2016-04-30-preview",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySets_ssrs_as_name'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "Standard_DS12_v2_Promo"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftSQLServer",
+                        "offer": "SQL2016SP1-WS2016",
+                        "sku": "SQLDEV",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[parameters('virtualMachines_ssrs_apim2_name')]",
+                        "createOption": "FromImage",
+                        "vhd": {
+                            "uri": "[concat('https', '://', parameters('storageAccounts_absgsbapimssrstest407_name'), '.blob.core.windows.net', concat('/vhds/', parameters('virtualMachines_ssrs_apim2_name'),'20170525161915.vhd'))]"
+                        },
+                        "caching": "ReadWrite"
+                    },
+                    "dataDisks": [
+                        {
+                            "lun": 0,
+                            "name": "[concat(parameters('virtualMachines_ssrs_apim2_name'),'-disk-1')]",
+                            "createOption": "Empty",
+                            "vhd": {
+                                "uri": "[concat('https', '://', parameters('storageAccounts_absgsbapimssrstest407_name'), '.blob.core.windows.net', concat('/vhds/', parameters('virtualMachines_ssrs_apim2_name'),'-disk-1-20170525161915.vhd'))]"
+                            },
+                            "caching": "ReadOnly",
+                            "diskSizeGB": 1023
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_ssrs_apim2_name')]",
+                    "adminUsername": "psgadmin",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true
+                    },
+                    "secrets": []
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_ssrs_apim2345_name'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[concat('https', '://', parameters('storageAccounts_absgsbapimssrstest872_name'), '.blob.core.windows.net', '/')]"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySets_ssrs_as_name'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_absgsbapimssrstest407_name'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_ssrs_apim2345_name'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_absgsbapimssrstest872_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Compute/virtualMachines/ssrsapim'.",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('virtualMachines_ssrsapim_name')]",
+            "apiVersion": "2016-04-30-preview",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySets_ssrs_as_name'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "Standard_DS12_v2_Promo"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftSQLServer",
+                        "offer": "SQL2016SP1-WS2016",
+                        "sku": "SQLDEV",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[parameters('virtualMachines_ssrsapim_name')]",
+                        "createOption": "FromImage",
+                        "vhd": {
+                            "uri": "[concat('https', '://', parameters('storageAccounts_absgsbapimssrstest409_name'), '.blob.core.windows.net', concat('/vhds/', parameters('virtualMachines_ssrsapim_name'),'20170525154414.vhd'))]"
+                        },
+                        "caching": "ReadWrite"
+                    },
+                    "dataDisks": [
+                        {
+                            "lun": 0,
+                            "name": "[concat(parameters('virtualMachines_ssrsapim_name'),'-disk-1')]",
+                            "createOption": "Empty",
+                            "vhd": {
+                                "uri": "[concat('https', '://', parameters('storageAccounts_absgsbapimssrstest409_name'), '.blob.core.windows.net', concat('/vhds/', parameters('virtualMachines_ssrsapim_name'),'-disk-1-20170525154414.vhd'))]"
+                            },
+                            "caching": "ReadOnly",
+                            "diskSizeGB": 1023
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_ssrsapim_name')]",
+                    "adminUsername": "psgadmin",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true
+                    },
+                    "secrets": []
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_ssrsapim638_name'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[concat('https', '://', parameters('storageAccounts_absgsbapimssrstest773_name'), '.blob.core.windows.net', '/')]"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySets_ssrs_as_name'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_absgsbapimssrstest409_name'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_ssrsapim638_name'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_absgsbapimssrstest773_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/loadBalancers/ssrs-lb'.",
+            "type": "Microsoft.Network/loadBalancers",
+            "name": "[parameters('loadBalancers_ssrs_lb_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "privateIPAddress": "172.19.0.4",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name')), '/subnets/default')]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "ssrs"
+                    }
+                ],
+                "loadBalancingRules": [],
+                "probes": [],
+                "inboundNatRules": [],
+                "outboundNatRules": [],
+                "inboundNatPools": []
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/networkInterfaces/ssrs-apim2345'.",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('networkInterfaces_ssrs_apim2345_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "172.19.0.6",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name')), '/subnets/default')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "public",
+                        "properties": {
+                            "privateIPAddress": "172.19.0.7",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_ssrs_apim2345_pub_name'))]"
+                            },
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name')), '/subnets/default')]"
+                            }
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableIPForwarding": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_ssrs_nsg_name'))]"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_ssrs_apim2345_pub_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_ssrs_nsg_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/networkInterfaces/ssrsapim638'.",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('networkInterfaces_ssrsapim638_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "172.19.0.5",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name')), '/subnets/default')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "public",
+                        "properties": {
+                            "privateIPAddress": "172.19.0.8",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_ssrsapim638_pub_name'))]"
+                            },
+                            "subnet": {
+                                "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name')), '/subnets/default')]"
+                            }
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableIPForwarding": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_ssrs_nsg_name'))]"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_ssrs_vnet_name'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_ssrsapim638_pub_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_ssrs_nsg_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/networkSecurityGroups/ssrs-nsg'.",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[parameters('networkSecurityGroups_ssrs_nsg_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "Allow-RDP",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/publicIPAddresses/ssrs-apim2345-pub'.",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[parameters('publicIPAddresses_ssrs_apim2345_pub_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/publicIPAddresses/ssrsapim638-pub'.",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[parameters('publicIPAddresses_ssrsapim638_pub_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Network/virtualNetworks/ssrs-vnet'.",
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[parameters('virtualNetworks_ssrs_vnet_name')]",
+            "apiVersion": "2017-03-01",
+            "location": "eastus2",
+            "scale": null,
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "172.19.0.0/24"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "172.19.0.0/24"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [
+                    {
+                        "name": "ssrstoapim",
+                        "properties": {
+                            "peeringState": "Connected",
+                            "remoteVirtualNetwork": {
+                                "id": "[parameters('virtualNetworks_ssrs_vnet_id')]"
+                            },
+                            "allowVirtualNetworkAccess": true,
+                            "allowForwardedTraffic": false,
+                            "allowGatewayTransit": false,
+                            "useRemoteGateways": false
+                        }
+                    }
+                ]
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Storage/storageAccounts/absgsbapimssrstest407'.",
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Premium_LRS",
+                "tier": "Premium"
+            },
+            "kind": "Storage",
+            "name": "[parameters('storageAccounts_absgsbapimssrstest407_name')]",
+            "apiVersion": "2016-01-01",
+            "location": "eastus2",
+            "tags": {},
+            "scale": null,
+            "properties": {},
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Storage/storageAccounts/absgsbapimssrstest409'.",
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Premium_LRS",
+                "tier": "Premium"
+            },
+            "kind": "Storage",
+            "name": "[parameters('storageAccounts_absgsbapimssrstest409_name')]",
+            "apiVersion": "2016-01-01",
+            "location": "eastus2",
+            "tags": {},
+            "scale": null,
+            "properties": {},
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Storage/storageAccounts/absgsbapimssrstest773'.",
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "name": "[parameters('storageAccounts_absgsbapimssrstest773_name')]",
+            "apiVersion": "2016-01-01",
+            "location": "eastus2",
+            "tags": {},
+            "scale": null,
+            "properties": {},
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/4fcb060b-546b-4151-adc0-c83a19ed8bce/resourceGroups/absg-sb-apimssrs-test/providers/Microsoft.Storage/storageAccounts/absgsbapimssrstest872'.",
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "name": "[parameters('storageAccounts_absgsbapimssrstest872_name')]",
+            "apiVersion": "2016-01-01",
+            "location": "eastus2",
+            "tags": {},
+            "scale": null,
+            "properties": {},
+            "dependsOn": []
+        }
+    ]
+}

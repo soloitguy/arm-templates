@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "alertEmail": {
+      "type": "string",
+      "defaultValue": "person@absg.com",
+      "metadata": {
+        "description": "Email address to send alerts to"
+      }
+    },
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "deploymentSize": {
+      "type": "string",
+      "defaultValue": "Dev",
+      "allowedValues": [
+        "Dev",
+        "Test",
+        "Stage",
+        "Prod"
+      ],
+      "metadata": {
+        "description": "The deployment size will determine how resources scale and fan out."
+      }
+    },
+    "dnsPrefix": {
+      "type": "string",
+      "defaultValue": "**^DELETETHIS!**"
+    },
+    "serverRegions": {
+      "type": "array",
+      "defaultValue": [
+        "eastus",
+        "westus"
+      ],
+      "minLength": 2,
+      "metadata": {
+        "description": "The regions the infrastructure will be deployed to."
+      }
+    },    
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "templateBaseUrl": "https://providersolution.blob.core.windows.net/arm-templates/",
+    "regionAmount": "[length(parameters('serverRegions'))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-01-01",
+      "name": "applicationInsights",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'appinsights.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appInsightsName": {
+            "value": "[concat('appinsights', parameters('appName'))]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "instrumentationKey": {
+      "type": "string",
+      "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+    },
+    "appInsightsSecretName": {
+      "type": "string",
+      "value": "appInsightsAnnotateSPN"
+    }
+  }
+}

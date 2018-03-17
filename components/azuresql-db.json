@@ -1,0 +1,126 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "alertEmail": {
+      "type": "string"
+    },
+    "edition": {
+      "type": "string",
+      "defaultValue": "Standard"
+    },
+    "databaseName": {
+      "type": "string",
+      "defaultValue": "database"
+    },
+    "serverName": {
+      "type": "string"
+    },
+    "serverRegion": {
+      "type": "string",
+      "defaultValue": "eastus"
+    },
+    "sku": {
+      "type": "string",
+      "defaultValue": "S0"
+    }
+  },
+  "variables": {
+    "alerts": [
+      {
+        "name": "[concat(parameters('databaseName'), '-cpu-percentage-alert')]",
+        "shortName": "DbCpuPercentageAlert",
+        "description": "CPU > 50 Percent",
+        "metricName": "cpu_percent",
+        "threshold": 50,
+        "windowSize": "PT5M"
+      },
+      {
+        "name": "[concat(parameters('databaseName'), '-deadlock-alert')]",
+        "shortName": "DeadlockAlert",
+        "description": "Deadlocks > 10",
+        "metricName": "deadlock",
+        "threshold": 10,
+        "windowSize": "PT5M"
+      },
+      {
+        "name": "[concat(parameters('databaseName'), '-failed-connection-alert')]",
+        "shortName": "FailedConnections",
+        "description": "Failed Connection > 10",
+        "metricName": "connection_failed",
+        "threshold": 10,
+        "windowSize": "PT5M"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "name": "[concat(parameters('serverName'), '/', parameters('databaseName'))]",
+      "apiVersion": "2014-04-01-preview",
+      "location": "[parameters('serverRegion')]",
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "createMode": "Default",
+        "edition": "[parameters('edition')]",
+        "requestedServiceObjectiveName": "[parameters('sku')]"
+      },
+      "resources": [
+        {
+          "name": "current",
+          "type": "transparentDataEncryption",
+          "dependsOn": [
+            "[parameters('databaseName')]"
+          ],
+          "location": null,
+          "apiVersion": "2014-04-01",
+          "properties": {
+            "status": "Enabled"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Insights/alertrules",
+      "name": "[variables('alerts')[copyIndex()].name]",
+      "apiVersion": "2014-04-01",
+      "copy": {
+        "name": "alertCopy",
+        "count": "[length(variables('alerts'))]"
+      },
+      "dependson": [
+        "[parameters('databaseName')]"
+      ],
+      "location": "eastus",
+      "properties": {
+        "name": "[variables('alerts')[copyIndex()].shortName]",
+        "description": "[variables('alerts')[copyIndex()].description]",
+        "isEnabled": true,
+        "condition": {
+          "odata.type": "Microsoft.Azure.Management.Insights.Models.ThresholdRuleCondition",
+          "dataSource": {
+            "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleMetricDataSource",
+            "resourceUri": "[resourceId('Microsoft.Sql/servers/databases', parameters('serverName'), parameters('databaseName'))]",
+            "metricName": "[variables('alerts')[copyIndex()].metricName]"
+          },
+          "threshold": "[variables('alerts')[copyIndex()].threshold]",
+          "windowSize": "[variables('alerts')[copyIndex()].windowSize]"
+        },
+        "action": {
+          "odata.type": "Microsoft.Azure.Management.Insights.Models.RuleEmailAction",
+          "sendToServiceOwners": false,
+          "customEmails": [
+            "[parameters('alertEmail')]"
+          ]
+        }
+      },
+      "resources": []
+    }
+  ],
+  "outputs": {
+    "databaseName": {
+      "type": "string",
+      "value": "[parameters('databaseName')]"
+    }
+  }
+}

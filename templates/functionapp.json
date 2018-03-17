@@ -1,0 +1,316 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "alertEmail": {
+      "type": "string",
+      "defaultValue": "person@absg.com",
+      "metadata": {
+        "description": "Email address to send alerts to"
+      }
+    },
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "deploymentSize": {
+      "type": "string",
+      "defaultValue": "Dev",
+      "allowedValues": [
+        "Dev",
+        "Test",
+        "Stage",
+        "Prod"
+      ],
+      "metadata": {
+        "description": "The deployment size will determine how resources scale and fan out."
+      }
+    },
+    "dnsPrefix": {
+      "type": "string",
+      "defaultValue": "**^DELETETHIS!**"
+    },    
+    "netCoreEnvironment": {
+      "type": "string",
+      "defaultValue": "Development",
+      "metadata": {
+        "description": "ASPNETCORE ENVIRONMENT VARIABLE"
+      }
+    },
+    "serverRegions": {
+      "type": "array",
+      "defaultValue": [
+        "eastus",
+        "westus"
+      ],
+      "minLength": 2,
+      "metadata": {
+        "description": "The regions the infrastructure will be deployed to."
+      }
+    },
+    "primaryEndpointConnectionName":{
+      "type": "string",
+      "defaultValue": "primaryMessagingConnection",
+      "metadata": {
+        "description": "Connection String for Service Bus"
+        }
+    },
+    "secondaryEndpointConnectionName":{
+      "type": "string",
+      "defaultValue": "secondaryMessagingConnection",
+      "metadata": {
+        "description": "Connection String for Service Bus"
+        }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "deploySize": "[variables(concat('deploySize',parameters('deploymentSize')))]",
+    "deploySizeDev": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Small",
+      "skuWorkerAmount": 1,
+      "vaultName": "psg-cp-dev-arm-keyvault"
+    },
+    "deploySizeTest": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Small",
+      "skuWorkerAmount": 1,
+      "vaultName": "psg-cp-test-arm-keyvault"
+    },
+    "deploySizeStage": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Medium",
+      "skuWorkerAmount": 2,
+      "vaultName": "psg-cp-stge-arm-keyvault"
+    },
+    "deploySizeProd": {
+      "dbEdition": "Standard",
+      "dbSku": "S0",
+      "skuName": "Standard",
+      "skuWorkerSize": "Medium",
+      "skuWorkerAmount": 2,
+      "vaultName": "psg-cp-prod-arm-keyvault"
+    },
+    "templateBaseUrl": "https://providersolution.blob.core.windows.net/arm-templates/",
+    "regionAmount": "[length(parameters('serverRegions'))]",
+    "webAppAmount": "[length(parameters('serverRegions'))]",
+    "webAppLast": "[concat('functionApp', sub(variables('regionAmount'),1))]",
+    "vaultId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/psg-management/providers/Microsoft.KeyVault/vaults/', variables('deploySize').vaultName)]",
+    "absgNotificationEmailSendGridApiKey":"absgNotificationEmailSendGridApiKey"
+  },
+  "resources": [
+   
+    
+    {
+      "apiVersion": "2015-01-01",
+      "name": "applicationInsights",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'appinsights.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appInsightsName": {
+            "value": "[concat('appinsights', parameters('appName'))]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "functionApp0",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'applicationInsights')]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'functionapp.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "alertEmail": {
+            "value": "[parameters('alertEmail')]"
+          },
+          "appName": {
+            "value": "[concat(parameters('appName'), 0)]"
+          },
+          "instrumentationKey": {
+            "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+          },
+          "netCoreEnvironment": {
+            "value": "[parameters('netCoreEnvironment')]"
+          },
+          "serverRegion": {
+            "value": "[parameters('serverRegions')[0]]"
+          },
+          "skuName": {
+            "value": "[variables('deploySize').skuName]"
+          },
+          "skuWorkerAmount": {
+            "value": "[variables('deploySize').skuWorkerAmount]"
+          },
+          "skuWorkerSize": {
+            "value": "[variables('deploySize').skuWorkerSize]"
+          },
+          "endpointConnection": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[parameters('primaryEndpointConnectionName')]"
+            }
+          },
+          "endpointConnectionSecondary": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[parameters('secondaryEndpointConnectionName')]"
+            }
+          },
+          "absgNotificationEmailSendGridApiKey": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[variables('absgNotificationEmailSendGridApiKey')]"
+            }
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "[concat('functionApp', copyIndex(1))]",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'applicationInsights')]"
+      ],
+      "copy": {
+        "name": "appcopy",
+        "count": "[sub(variables('webAppAmount'), 1)]"
+      },
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'functionapp.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "alertEmail": {
+            "value": "[parameters('alertEmail')]"
+          },
+          "appName": {
+            "value": "[concat(parameters('appName'), copyIndex(1))]"
+          },
+          "instrumentationKey": {
+            "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+          },
+          "netCoreEnvironment": {
+            "value": "[parameters('netCoreEnvironment')]"
+          },
+          "serverRegion": {
+            "value": "[parameters('serverRegions')[copyIndex(1)]]"
+          },
+          "skuName": {
+            "value": "[variables('deploySize').skuName]"
+          },
+          "skuWorkerAmount": {
+            "value": "[variables('deploySize').skuWorkerAmount]"
+          },
+          "skuWorkerSize": {
+            "value": "[variables('deploySize').skuWorkerSize]"
+          },
+          "endpointConnection": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[parameters('secondaryEndpointConnectionName')]"
+            }
+          },
+          "endpointConnectionSecondary": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[parameters('primaryEndpointConnectionName')]"
+            }
+          },
+          "absgNotificationEmailSendGridApiKey": {
+            "reference": {
+              "keyVault": {
+                "id": "[variables('vaultId')]"
+              },
+              "secretName": "[variables('absgNotificationEmailSendGridApiKey')]"
+            }
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "_appUrls": {
+            "value": "[reference(concat('functionApp', copyIndex())).outputs._appUrls.value]"
+          },
+          "_resourceIds": {
+            "value": "[reference(concat('functionApp', copyIndex())).outputs._resourceIds.value]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "appResourceName": {
+      "type": "string",
+      "value": "[reference(variables('webAppLast')).outputs.appResourceName.value]"
+    },
+    "instrumentationKey": {
+      "type": "string",
+      "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+    },
+    "vaultName": {
+      "type": "string",
+      "value": "[variables('deploySize').vaultName]"
+    },
+    "_resourceIds": {
+      "type": "array",
+      "value": "[reference(variables('webAppLast')).outputs._resourceIds.value]"
+    },
+    "_appUrls": {
+      "type": "array",
+      "value": "[reference(variables('webAppLast')).outputs._appUrls.value]"
+    },
+    "appInsightsSecretName": {
+      "type": "string",
+      "value": "appInsightsAnnotateSPN"
+    }
+  }
+}

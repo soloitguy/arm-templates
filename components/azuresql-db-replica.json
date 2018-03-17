@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "createMode": {
+      "type": "string",
+      "defaultValue": "OnlineSecondary"
+    },
+    "edition": {
+      "type": "string",
+      "defaultValue": "Standard"
+    },
+    "databaseName": {
+      "type": "string"
+    },
+    "serverName": {
+      "type": "string"
+    },
+    "serverRegion": {
+      "type": "string"
+    },
+    "sourceServerName": {
+      "type": "string"
+    },
+    "sku": {
+      "type": "string",
+      "defaultValue": "S0"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "name": "[concat(parameters('serverName'), '/', parameters('databaseName'))]",
+      "apiVersion": "2014-04-01-preview",
+      "location": "[parameters('serverRegion')]",
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "createMode": "[parameters('createMode')]",
+        "edition": "[parameters('edition')]",
+        "requestedServiceObjectiveName": "[parameters('sku')]",
+        "sourceDatabaseId": "[resourceId('Microsoft.Sql/servers/databases', parameters('sourceServerName'), parameters('databaseName'))]"
+      },
+      "resources": []
+    }
+  ],
+  "outputs": {}
+}

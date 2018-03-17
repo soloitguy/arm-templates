@@ -1,0 +1,248 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "deploymentSize": {
+      "type": "string",
+      "defaultValue": "Dev",
+      "allowedValues": [
+        "Dev",
+        "Test",
+        "Stage",
+        "Prod"
+      ],
+      "metadata": {
+        "description": "The deployment size will determine how resources scale and fan out."
+      }
+    },
+    "serverRegions": {
+      "type": "array",
+      "defaultValue": [
+        "eastus",
+        "westus"
+      ],
+      "minLength": 2
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "deploySize": "[variables(concat('deploySize',parameters('deploymentSize')))]",
+    "deploySizeDev": {
+      "skuName": "Standard",
+      "skuWorkerSize": "Small",
+      "skuWorkerAmount": 1,
+      "vaultName": "psg-cp-dev-arm-keyvault",
+      "envUrl": ".dev"
+    },
+    "deploySizeTest": {
+      "skuName": "Standard",
+      "skuWorkerSize": "Small",
+      "skuWorkerAmount": 1,
+      "vaultName": "psg-cp-test-arm-keyvault",
+      "envUrl": ".test"
+    },
+    "deploySizeStage": {
+      "skuName": "Standard",
+      "skuWorkerSize": "Medium",
+      "skuWorkerAmount": 2,
+      "vaultName": "psg-cp-stge-arm-keyvault",
+      "envUrl": ".stage"
+    },
+    "deploySizeProd": {
+      "skuName": "Standard",
+      "skuWorkerSize": "Medium",
+      "skuWorkerAmount": 2,
+      "vaultName": "psg-cp-prod-arm-keyvault",
+      "envUrl": ""
+    },
+    "templateBaseUrl": "https://providersolution.blob.core.windows.net/arm-templates/",
+    "webAppAmount": "[length(parameters('serverRegions'))]",
+    "webAppLast": "[concat('webApp', sub(variables('webAppAmount'),1))]",
+    "vaultId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/psg-management/providers/Microsoft.KeyVault/vaults/', variables('deploySize').vaultName)]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-01-01",
+      "name": "applicationInsights",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'appinsights.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appInsightsName": {
+            "value": "[concat('appinsights', parameters('appName'))]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "webApp0",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'applicationInsights')]"
+      ],
+      "properties": {
+        "mode": "incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'webclient.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appName": {
+            "value": "[concat(parameters('appName'), 0)]"
+          },
+          "instrumentationKey": {
+            "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+          },
+          "serverRegion": {
+            "value": "[parameters('serverRegions')[0]]"
+          },
+	        "skuName": {
+            "value": "[variables('deploySize').skuName]"
+          },
+          "skuWorkerAmount": {
+            "value": "[variables('deploySize').skuWorkerAmount]"
+          },
+          "skuWorkerSize": {
+            "value": "[variables('deploySize').skuWorkerSize]"
+          },
+          "vaultId": {
+            "value": "[variables('vaultId')]"
+          },
+          "envUrl": {
+            "value": "[variables('deploySize').envUrl]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "[concat('webApp', copyIndex(1))]",
+      "type": "Microsoft.Resources/deployments",
+      "dependsOn": [
+        "[concat('Microsoft.Resources/deployments/', 'applicationInsights')]"
+      ],
+      "copy": {
+        "name": "appcopy",
+        "count": "[sub(variables('webAppAmount'), 1)]"
+      },
+      "properties": {
+        "mode": "incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'webclient.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appName": {
+            "value": "[concat(parameters('appName'), copyIndex(1))]"
+          },
+          "instrumentationKey": {
+            "value": "[reference('applicationInsights').outputs.instrumentationKey.value]"
+          },
+          "serverRegion": {
+            "value": "[parameters('serverRegions')[copyIndex(1)]]"
+          },
+          "skuName": {
+            "value": "[variables('deploySize').skuName]"
+          },
+          "skuWorkerAmount": {
+            "value": "[variables('deploySize').skuWorkerAmount]"
+          },
+          "skuWorkerSize": {
+            "value": "[variables('deploySize').skuWorkerSize]"
+          },
+          "vaultId": {
+            "value": "[variables('vaultId')]"
+          },
+          "envUrl": {
+            "value": "[variables('deploySize').envUrl]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "_appUrls": {
+            "value": "[reference(concat('webApp', copyIndex())).outputs._appUrls.value]"
+          },
+          "_resourceIds": {
+            "value": "[reference(concat('webApp', copyIndex())).outputs._resourceIds.value]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-01-01",
+      "name": "trafficManager",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "incremental",
+        "templateLink": {
+          "uri": "[concat(variables('templateBaseUrl'), 'trafficmanager.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "appName": {
+            "value": "[parameters('appName')]"
+          },
+          "resourceIds": {
+            "value": "[reference(variables('webAppLast')).outputs._resourceIds.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "appResourceName": {
+      "type": "string",
+      "value": "[reference(variables('webAppLast')).outputs.appResourceName.value]"
+    },
+    "appUrl": {
+      "type": "string",
+      "value": "[reference('trafficManager').outputs.url.value]"
+    },
+    "_resourceIds": {
+      "type": "array",
+      "value": "[reference(variables('webAppLast')).outputs._resourceIds.value]"
+    },
+    "_appUrls": {
+      "type": "array",
+      "value": "[reference(variables('webAppLast')).outputs._appUrls.value]"
+    },
+    "vaultName": {
+      "type": "string",
+      "value": "[variables('deploySize').vaultName]"
+    },
+    "appInsightsSecretName": {
+      "type": "string",
+      "value": "appInsightsAnnotateSPN"
+    }
+  }
+}

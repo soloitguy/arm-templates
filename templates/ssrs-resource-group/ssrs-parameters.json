@@ -1,0 +1,51 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "availabilitySets_ssrs_as_name": {
+            "value": null
+        },
+        "virtualMachines_ssrs_apim2_name": {
+            "value": null
+        },
+        "virtualMachines_ssrsapim_name": {
+            "value": null
+        },
+        "loadBalancers_ssrs_lb_name": {
+            "value": null
+        },
+        "networkInterfaces_ssrs_apim2345_name": {
+            "value": null
+        },
+        "networkInterfaces_ssrsapim638_name": {
+            "value": null
+        },
+        "networkSecurityGroups_ssrs_nsg_name": {
+            "value": null
+        },
+        "publicIPAddresses_ssrs_apim2345_pub_name": {
+            "value": null
+        },
+        "publicIPAddresses_ssrsapim638_pub_name": {
+            "value": null
+        },
+        "virtualNetworks_ssrs_vnet_name": {
+            "value": null
+        },
+        "storageAccounts_absgsbapimssrstest407_name": {
+            "value": null
+        },
+        "storageAccounts_absgsbapimssrstest409_name": {
+            "value": null
+        },
+        "storageAccounts_absgsbapimssrstest773_name": {
+            "value": null
+        },
+        "storageAccounts_absgsbapimssrstest872_name": {
+            "value": null
+        },
+        "virtualNetworks_ssrs_vnet_id": {
+            "value": null
+        }
+    }
+}

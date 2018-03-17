@@ -1,0 +1,123 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "endpoint1": {
+      "type": "string",
+      "metadata": {
+        "description": "Endpoint 1"
+      }
+    },
+    "endpoint2": {
+      "type": "string",
+      "metadata": {
+        "description": "Endpoint 2"
+      }
+    },
+    "endpointLocation1": {
+      "type": "string",
+      "metadata": {
+        "description": "EndpointLocation 1"
+      }
+    },
+    "endpointLocation2": {
+      "type": "string",
+      "metadata": {
+        "description": "EndpointLocation 2"
+      }
+    },
+    "serviceHealthCheck": {
+      "type": "string",
+      "defaultValue": "/ping.html",
+      "metadata": {
+        "description": "Endpoint on services to define healthcheck for alerts and load balancer."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "trafficManagerName": "[concat('tfcmngr-', parameters('appName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/trafficManagerProfiles",
+      "apiVersion": "2017-05-01",
+      "location": "global",
+      "name": "[variables('trafficManagerName')]",
+      "properties": {
+        "profileStatus": "Enabled",
+        "trafficRoutingMethod": "Performance",
+        "dnsConfig": {
+          "relativeName": "[variables('trafficManagerName')]",
+          "fqdn": "[concat(variables('trafficManagerName'),'.trafficmanager.net')]",
+          "ttl": 30
+        },
+        "monitorConfig": {
+          "protocol": "HTTPS",
+          "port": 443,
+          "path": "[parameters('serviceHealthCheck')]",
+          "intervalInSeconds": 30,
+          "toleratedNumberOfFailures": 3,
+          "timeoutInSeconds": 10          
+        },
+        "endpoints": [
+            {
+                "name": "Portal0",
+                "type": "Microsoft.Network/trafficManagerProfiles/externalEndpoints",
+                "properties": {
+                    "endpointStatus": "Enabled",
+                    "target": "[parameters('endpoint1')]",
+                    "weight": 1,
+                    "priority": 1,
+                    "endpointLocation": "[parameters('endpointLocation1')]"
+                }
+            },
+            {
+                "name": "Portal1",
+                "type": "Microsoft.Network/trafficManagerProfiles/externalEndpoints",
+                "properties": {
+                    "endpointStatus": "Enabled",
+                    "target": "[parameters('endpoint2')]",
+                    "weight": 1,
+                    "priority": 2,
+                    "endpointLocation": "[parameters('endpointLocation2')]"
+                }
+            }
+        ]
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      }
+    }
+  ],
+  "outputs": {
+    "url": {
+      "type": "string",
+      "value": "[reference(concat('Microsoft.Network/trafficManagerProfiles/', variables('trafficManagerName'))).dnsConfig.fqdn]"
+    }
+  }
+}

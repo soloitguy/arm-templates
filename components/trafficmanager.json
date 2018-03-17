@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "resourceIds": {
+      "type": "array",
+      "metadata": {
+        "description": "An array of Azure resource webapp ids that the traffic manager will point to."
+      }
+    },
+    "serviceHealthCheck": {
+      "type": "string",
+      "defaultValue": "/ping",
+      "metadata": {
+        "description": "Endpoint on services to define healthcheck for alerts and load balancer."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    }
+  },
+  "variables": {
+    "trafficManagerName": "[concat('tfcmngr-', parameters('appName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/trafficManagerProfiles",
+      "apiVersion": "2015-11-01",
+      "location": "global",
+      "name": "[variables('trafficManagerName')]",
+      "properties": {
+        "profileStatus": "Enabled",
+        "trafficRoutingMethod": "Performance",
+        "dnsConfig": {
+          "relativeName": "[variables('trafficManagerName')]",
+          "ttl": 30
+        },
+        "monitorConfig": {
+          "protocol": "HTTP",
+          "port": 80,
+          "path": "[parameters('serviceHealthCheck')]"
+        }
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/trafficManagerProfiles/azureEndpoints",
+      "apiVersion": "2015-11-01",
+      "dependsOn": [
+        "[concat('Microsoft.Network/trafficManagerProfiles/', variables('trafficManagerName'))]"
+      ],
+      "location": "global",
+      "copy": {
+        "name": "endpointcopy",
+        "count": "[length(parameters('resourceIds'))]"
+      },
+      "name": "[concat(variables('trafficManagerName'),'/Endpoint', copyIndex())]",
+      "properties": {
+        "targetResourceId": "[parameters('resourceIds')[copyIndex()]]",
+        "endpointStatus": "Enabled"
+      }
+    }
+  ],
+  "outputs": {
+    "url": {
+      "type": "string",
+      "value": "[reference(concat('Microsoft.Network/trafficManagerProfiles/', variables('trafficManagerName'))).dnsConfig.fqdn]"
+    }
+  }
+}

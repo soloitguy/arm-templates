@@ -1,0 +1,195 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "The build id will determine how resources are named and identified."
+      }
+    },
+    "admin": {
+      "type": "string",
+      "defaultValue": "psgadmin",
+      "metadata": {
+        "description": "The admin user of the SQL Server"
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The password of the admin user of the SQL Server"
+      }
+    },
+    "auditEmail": {
+      "type": "string",
+      "defaultValue": "person@absg.com",
+      "metadata": {
+        "description": "Email to send audit alerts to"
+      }
+    },
+    "serverRegion": {
+      "type": "string",
+      "defaultValue": "eastus",
+      "metadata": {
+        "description": "Set the regions to deploy to"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "businessUnit": "",
+        "capability": "",
+        "costCenter": "",
+        "createdBy": "",
+        "environment": "",
+        "owner": ""
+      },
+      "metadata": {
+        "description": "The tagging structure required for accurate governance."
+      }
+    },
+    "_resourceIds": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "For the purpose of looping and roundtripping values through templates."
+      }
+    },
+    "_serverNames": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "For the purpose of looping and roundtripping values through templates."
+      }
+    }
+  },
+  "variables": {
+    "edition": "Standard",
+    "sku": "S0",
+    "serverName": "[toLower(concat('sqlserver-', parameters('appName')))]",
+    "storageAccountName": "[toLower(replace(parameters('appName'),'-',''))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "Storage",
+      "name": "[variables('storageAccountName')]",
+      "apiVersion": "2016-01-01",
+      "location": "[parameters('serverRegion')]",
+      "properties": {
+        "encryption": {
+          "services": {
+            "blob": {
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers",
+      "name": "[variables('serverName')]",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('serverRegion')]",
+      "properties": {
+        "administratorLogin": "[parameters('admin')]",
+        "administratorLoginPassword": "[parameters('adminPassword')]",
+        "version": "12.0"
+      },
+      "tags": {
+        "businessUnit": "[toUpper(parameters('tags').businessUnit)]",
+        "capability": "[toUpper(parameters('tags').capability)]",
+        "costCenter": "[toUpper(parameters('tags').costCenter)]",
+        "createdBy": "[toLower(parameters('tags').createdBy)]",
+        "environment": "[toLower(parameters('tags').environment)]",
+        "owner": "[toLower(parameters('tags').owner)]"
+      },
+      "resources": [
+        {
+          "type": "firewallrules",
+          "name": "AllowAllWindowsAzureIps",
+          "apiVersion": "2015-05-01-preview",
+          "location": "[parameters('serverRegion')]",
+          "properties": {
+            "endIpAddress": "0.0.0.0",
+            "startIpAddress": "0.0.0.0"
+          },
+          "dependsOn": [
+            "[variables('serverName')]"
+          ]
+        },
+        {
+          "apiVersion": "2015-05-01-preview",
+          "type": "auditingSettings",
+          "name": "DefaultAuditPolicy",
+          "dependsOn": [
+            "[concat('Microsoft.Sql/servers/',variables('serverName'))]",
+            "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
+          ],
+          "properties": {
+            "state": "Enabled",
+            "storageEndpoint": "[concat('https://',variables('storageAccountName'),'.blob.core.windows.net')]",
+            "storageAccountAccessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value]",
+			"auditActionsAndGroups": [ "SUCCESSFUL_DATABASE_AUTHENTICATION_GROUP", "DATABASE_LOGOUT_GROUP", "USER_CHANGE_PASSWORD_GROUP" ],
+            "storageAccountSubscriptionId": "[subscription().subscriptionId]",
+			"isStorageSecondaryKeyInUse": false
+          }
+        },
+        {
+          "apiVersion": "2015-05-01-preview",
+          "type": "securityAlertPolicies",
+          "name": "DefaultSecurityAlert",
+          "dependsOn": [
+            "[variables('serverName')]",
+            "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
+            "[concat('Microsoft.Sql/servers/',variables('serverName'),'/auditingSettings/DefaultAuditPolicy')]"
+          ],
+          "properties": {
+            "state": "Enabled",
+            "disabledAlerts": "",
+            "emailAddresses": "[parameters('auditEmail')]",
+            "emailAccountAdmins": "Disabled",
+            "retentionDays": "30",
+            "storageEndpoint": "[concat('https://', variables('storageAccountName'), '.blob.core.windows.net/')]",
+            "storageAccountAccessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts',variables('storageAccountName')),providers('Microsoft.Storage','storageAccounts').apiVersions[0]).keys[0].value]"
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "admin": {
+      "type": "string",
+      "value": "[parameters('admin')]"
+    },
+    "password": {
+      "type": "securestring",
+      "value": "[parameters('adminPassword')]"
+    },
+    "serverName": {
+      "type": "string",
+      "value": "[variables('serverName')]"
+    },
+    "serverRegion": {
+      "type": "string",
+      "value": "[parameters('serverRegion')]"
+    },
+    "url": {
+      "type": "string",
+      "value": "[reference(concat('Microsoft.Sql/servers/', variables('serverName'))).fullyQualifiedDomainName]"
+    },
+    "_resourceIds": {
+      "type": "array",
+      "value": "[concat(parameters('_resourceIds'),split(resourceId('Microsoft.Sql/servers', variables('serverName')), ','))]"
+    },
+    "_serverNames": {
+      "type": "array",
+      "value": "[concat(parameters('_serverNames'),split(variables('serverName'), ','))]"
+    }
+  }
+}
